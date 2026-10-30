@@ -392,25 +392,55 @@ class DeviceFlashingManager:
         if not self.enabled:
             return "[dim]Flashing: Off[/dim]"
         if not self.sessions:
-            return "[dim green]Flashing: Standby (0 active)[/dim green]"
+            standby_lbl = {
+                "ua": "[dim green]Прошивка: Очікування (0 активних)[/dim green]",
+                "ru": "[dim green]Прошивка: Ожидание (0 активных)[/dim green]",
+                "en": "[dim green]Flashing: Standby (0 active)[/dim green]"
+            }.get(lang, "[dim green]Flashing: Standby (0 active)[/dim green]")
+            return standby_lbl
         
         parts = []
         for s in list(self.sessions.values())[:2]:
             parts.append(f"{s.device_name[:12]}: {s.progress_percent}% [{s.remaining_time}]")
         more = f" +{len(self.sessions) - 2}" if len(self.sessions) > 2 else ""
-        return f"[bold bright_cyan]⚡ Flashing ({len(self.sessions)}):[/bold bright_cyan] " + ", ".join(parts) + more
+        badge_lbl = {
+            "ua": "⚡ Прошивка",
+            "ru": "⚡ Прошивка",
+            "en": "⚡ Flashing"
+        }.get(lang, "⚡ Flashing")
+        return f"[bold bright_cyan]{badge_lbl} ({len(self.sessions)}):[/bold bright_cyan] " + ", ".join(parts) + more
 
-    def render_overview_table(self) -> Table:
-        table = Table(title="⚡ PHONEX OFFLINE FLASHING SESSIONS", expand=True, border_style="cyan")
-        table.add_column("Device Name", style="bold bright_white")
-        table.add_column("Progress", style="bold green", justify="center")
-        table.add_column("Remaining", style="magenta", justify="center")
-        table.add_column("Status", style="yellow")
-        table.add_column("Errors", style="red", justify="center")
-        table.add_column("Last Action", style="dim")
+    def render_overview_table(self, lang: str = "ua") -> Table:
+        titles = {
+            "ua": "⚡ СЕСІЇ ПРОШИВКИ ПРИСТРОЇВ PHONEX (OFFLINE OCR)",
+            "ru": "⚡ СЕССИИ ПРОШИВКИ УСТРОЙСТВ PHONEX (OFFLINE OCR)",
+            "en": "⚡ PHONEX OFFLINE FLASHING SESSIONS"
+        }
+        cols = {
+            "ua": ("Пристрій", "Прогрес", "Залишилось", "Статус", "Помилки", "Остання дія"),
+            "ru": ("Устройство", "Прогресс", "Осталось", "Статус", "Ошибки", "Последнее действие"),
+            "en": ("Device Name", "Progress", "Remaining", "Status", "Errors", "Last Action")
+        }
+        empty_row = {
+            "ua": ("[dim]Немає активних сесій прошивки[/dim]", "--", "--", "ОЧІКУВАННЯ", "0", "Слухаємо повідомлення бота..."),
+            "ru": ("[dim]Нет активных сессий прошивки[/dim]", "--", "--", "ОЖИДАНИЕ", "0", "Ожидаем сообщения бота..."),
+            "en": ("[dim]No active flashing devices[/dim]", "--", "--", "STANDBY", "0", "Listening for bot messages...")
+        }
+
+        title = titles.get(lang, titles["ua"])
+        c = cols.get(lang, cols["ua"])
+        er = empty_row.get(lang, empty_row["ua"])
+
+        table = Table(title=title, expand=True, border_style="cyan")
+        table.add_column(c[0], style="bold bright_white")
+        table.add_column(c[1], style="bold green", justify="center")
+        table.add_column(c[2], style="magenta", justify="center")
+        table.add_column(c[3], style="yellow")
+        table.add_column(c[4], style="red", justify="center")
+        table.add_column(c[5], style="dim")
 
         if not self.sessions:
-            table.add_row("[dim]No active flashing devices[/dim]", "--", "--", "STANDBY", "0", "Listening for bot messages...")
+            table.add_row(er[0], er[1], er[2], er[3], er[4], er[5])
         else:
             for s in self.sessions.values():
                 table.add_row(

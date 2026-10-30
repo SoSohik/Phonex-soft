@@ -8,8 +8,20 @@ from typing import Optional, List, Dict, Any, Tuple
 
 if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
+    try:
+        os.system("chcp 65001 >nul 2>&1")
+    except Exception:
+        pass
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stdin, "reconfigure"):
+            sys.stdin.reconfigure(encoding='utf-8', errors='replace')
     except Exception:
         pass
 
@@ -101,10 +113,12 @@ TEXTS = {
         "state_paused": "⏸️ PAUSED",
         "state_rolling": "🎲 ROLLING...",
         "state_active": "🟢 ACTIVE (AUTO)",
+        "state_connecting": "🟡 CONNECTING...",
         "hint_login": "Type 'login' to sign in",
         "hint_start": "Type 'on' to start auto-roll",
         "hint_rolling": "Sending command to bot",
         "hint_active": "Auto-roll running smoothly",
+        "hint_connecting": "Authorizing session...",
         "timer_ready": "⚡ READY TO ROLL",
         "timer_sending": "Sending request...",
         "timer_paused": "Timer paused",
@@ -118,8 +132,9 @@ TEXTS = {
         "log_empty": "Log is empty...",
         "cmd_prompt_hint": "Type [bold cyan]help[/bold cyan] for guide, [bold cyan]r[/bold cyan] to refresh, or [bold green]on[/bold green] to run.",
         "input_prompt": "\nCommand > ",
+        "choice_prompt": "Choice",
         "unknown_cmd": "Unknown command '{}'. Type 'help'.",
-        "press_enter": "\nPress Enter to return to main menu...",
+        "press_enter": "\nPress Enter to return...",
         "shutdown_msg": "\n[bold yellow]Stopping and saving session...[/bold yellow]",
         "shutdown_done": "[bold green]Stopped successfully. Session saved![/bold green]\n",
         "lang_switched": "Language switched to English.",
@@ -148,10 +163,57 @@ TEXTS = {
         "clearhist_deleted_count": "✅ Deleted {} records of '{}'.",
         "chat_title": "💬 LAST {} MESSAGES WITH {}",
         "login_title": "🔐 TELEGRAM MTPROTO AUTHENTICATION",
-        "login_method_1": "1 -> Fast login via QR-Code (Recommended, scan via Telegram App)",
-        "login_method_2": "2 -> Login by Phone Number (5-digit code in Telegram App)",
+        "login_choose_method": "Select login method",
+        "login_method_1": "1 -> Fast login via QR-Code (Recommended, scan in Telegram app)",
+        "login_method_2": "2 -> Login by Phone Number (5-digit code in Telegram App / SMS)",
         "login_method_3": "3 -> Paste Telethon StringSession directly",
-        "login_cancel": "0 -> Cancel"
+        "login_cancel": "0 -> Cancel",
+        "phone_login_title": "📱 LOGIN BY PHONE NUMBER",
+        "phone_login_hint": "Enter your phone number in international format (e.g. +380981234567) or type '0' to cancel:",
+        "phone_empty_hint": "[yellow]Please enter a valid phone number (e.g. +380981234567) or '0' to cancel.[/yellow]",
+        "phone_input_prompt": "Phone number > ",
+        "phone_sending": "Sending authorization request for {}...",
+        "phone_code_app_sent": "[bold bright_green]✅ Verification code sent to your Telegram App![/bold bright_green]\n[bold bright_yellow]👉 OPEN YOUR TELEGRAM APP (on phone or PC).[/bold bright_yellow]\n[bold white]The code arrived in the official chat [cyan]'Telegram' / 'Service Notifications'[/cyan] (NOT by SMS)![/bold white]",
+        "phone_code_sms_sent": "[bold bright_green]✅ Verification code sent via SMS![/bold bright_green]\n[bold bright_yellow]👉 Check standard SMS messages on your phone.[/bold bright_yellow]",
+        "phone_code_call_sent": "[bold yellow]📞 Telegram will call your phone and dictate the verification code.[/bold yellow]",
+        "phone_code_general_sent": "[bold green]✅ Verification code dispatched![/bold green]",
+        "phone_code_prompt": "Enter verification code (from Telegram / SMS) > ",
+        "phone_2fa_notice": "Two-step verification (2FA Cloud Password) is enabled on this account!",
+        "phone_2fa_prompt": "Enter your 2FA Cloud Password > ",
+        "phone_auth_success": "Successfully authorized as {}!",
+        "phone_err_invalid": "Invalid phone number: '{}'. Please verify your country code (+380...)!",
+        "phone_err_code_invalid": "Invalid verification code! Please try again.",
+        "phone_err_code_expired": "Verification code has expired. Please log in again.",
+        "phone_err_flood": "Telegram temporary rate limit. Wait {} seconds.",
+        "phone_err_general": "Login error: {}",
+        "qr_title": "📱 SCAN QR CODE WITH TELEGRAM",
+        "qr_hint": "Open Telegram -> Settings -> Devices -> Link Desktop Device",
+        "qr_waiting": "Waiting for QR Code scan in Telegram App...",
+        "qr_auth_success": "Authorized via QR Code as {}!",
+        "qr_error": "QR Code login error: {}",
+        "string_prompt": "Paste StringSession > ",
+        "string_invalid": "Invalid StringSession!",
+        "flash_table_title": "⚡ PHONEX OFFLINE FLASHING SESSIONS",
+        "flash_status_label": "Auto-Flashing Status",
+        "flash_enabled": "ENABLED (Auto-handling active)",
+        "flash_disabled": "DISABLED (Auto-handling off)",
+        "flash_options": "Options: [bold white]1[/bold white] Toggle ON/OFF  |  [bold white]r[/bold white] Refresh  |  [bold red]0[/bold red] Return to main menu",
+        "flash_action_prompt": "Flashing action > ",
+        "flash_toggled": "Auto-flashing module is now {}!",
+        "flash_no_sessions": "No active flashing devices",
+        "flash_waiting_bot": "Listening for bot messages...",
+        "log_auto_on": "Auto-mode activated. Initial check dispatched.",
+        "log_auto_off": "Auto-mode paused.",
+        "log_manual_trigger": "Manual trigger '{}'...",
+        "log_sending_cmd": "Sending command '{}'...",
+        "log_drop_received": "🎁 Drop received: {} [{}] ({} pts)!",
+        "log_cooldown_detected": "Cooldown: {} (+{}s jitter). Next: {}.",
+        "log_wait_received": "Wait message received. Next retry in {}.",
+        "log_cycle_success": "Success! Next cycle in {}.",
+        "log_no_reply": "Bot did not reply within 25s. Retrying in {}s.",
+        "log_session_revoked": "Saved session is no longer authorized. Please log in again using 'login'.",
+        "log_logged_out": "Logged out successfully. Session cleared.",
+        "log_bot_confirmed": "Target bot confirmed: {} ({})"
     },
     "ua": {
         "title": "⚡ PHONEX SOFT v1.0",
@@ -166,14 +228,16 @@ TEXTS = {
         "bot_reply_title": "💬 ВІДПОВІДЬ БОТА",
         "recent_logs_title": "📋 ОСТАННІ ПОДІЇ",
         "commands_guide_title": "📖 ДОВІДКА КОМАНД",
-        "state_disconnected": "🔴 ВІДinput_promptКЛЮЧЕНО",
+        "state_disconnected": "🔴 ВІДКЛЮЧЕНО",
         "state_paused": "⏸️ ПРИЗУПИНЕНО",
         "state_rolling": "🎲 РОЛИМО...",
         "state_active": "🟢 АКТИВНО (АВТО)",
+        "state_connecting": "🟡 ПІДКЛЮЧЕННЯ...",
         "hint_login": "Введіть 'login' для входу",
         "hint_start": "Введіть 'on' для запуску",
         "hint_rolling": "Надсилаємо команду боту",
         "hint_active": "Авто-рол увімкнено",
+        "hint_connecting": "Авторизація сесії...",
         "timer_ready": "⚡ ГОТОВО ДО РОЛУ",
         "timer_sending": "Запит відправляється...",
         "timer_paused": "Таймер на паузі",
@@ -187,8 +251,9 @@ TEXTS = {
         "log_empty": "Журнал порожній...",
         "cmd_prompt_hint": "Введіть [bold cyan]help[/bold cyan] для довідки, [bold cyan]r[/bold cyan] для оновлення, або [bold green]on[/bold green] для запуску.",
         "input_prompt": "\nКоманда > ",
+        "choice_prompt": "Вибір",
         "unknown_cmd": "Невідома команда '{}'. Введіть 'help'.",
-        "press_enter": "\nНатисніть Enter для повернення в головне меню...",
+        "press_enter": "\nНатисніть Enter для повернення...",
         "shutdown_msg": "\n[bold yellow]Зупинка та збереження сесії...[/bold yellow]",
         "shutdown_done": "[bold green]Роботу успішно завершено. Сесію збережено![/bold green]\n",
         "lang_switched": "Мову змінено на Українську.",
@@ -217,10 +282,57 @@ TEXTS = {
         "clearhist_deleted_count": "✅ Видалено {} записів про '{}'.",
         "chat_title": "💬 ОСТАННІ {} ПОВІДОМЛЕНЬ У ЧАТІ З {}",
         "login_title": "🔐 АВТОРИЗАЦІЯ TELEGRAM MTPROTO",
-        "login_method_1": "1 -> Швидкий вхід через QR-код (рекомендовано, сканувати через TG)",
-        "login_method_2": "2 -> Вхід за номером телефону (код із 5 цифр у додатку Telegram)",
+        "login_choose_method": "Оберіть спосіб входу",
+        "login_method_1": "1 -> Швидкий вхід через QR-код (Рекомендовано, сканувати у додатку TG)",
+        "login_method_2": "2 -> Вхід за номером телефону (Код у додатку Telegram / SMS)",
         "login_method_3": "3 -> Вставити готову StringSession",
-        "login_cancel": "0 -> Скасувати"
+        "login_cancel": "0 -> Скасувати",
+        "phone_login_title": "📱 ВХІД ЗА НОМЕРОМ ТЕЛЕФОНУ",
+        "phone_login_hint": "Введіть номер у міжнародному форматі (наприклад: +380981234567) або введіть '0' для скасування:",
+        "phone_empty_hint": "[yellow]Будь ласка, введіть номер телефону (наприклад: +380981234567) або '0' для скасування.[/yellow]",
+        "phone_input_prompt": "Номер телефону > ",
+        "phone_sending": "Надсилаємо запит авторизації для {}...",
+        "phone_code_app_sent": "[bold bright_green]✅ Код підтвердження надіслано в додаток Telegram![/bold bright_green]\n[bold bright_yellow]👉 ВІДКРИЙТЕ ВАШ ДОДАТОК TELEGRAM (на телефоні або ПК).[/bold bright_yellow]\n[bold white]Код надійшов у службовий чат [cyan]'Telegram' / 'Служебные уведомления'[/cyan] (НЕ в SMS)![/bold white]",
+        "phone_code_sms_sent": "[bold bright_green]✅ Код підтвердження надіслано через SMS![/bold bright_green]\n[bold bright_yellow]👉 Перевірте звичайні SMS-повідомлення на телефоні.[/bold bright_yellow]",
+        "phone_code_call_sent": "[bold yellow]📞 Telegram зателефонує вам і продиктує код підтвердження.[/bold yellow]",
+        "phone_code_general_sent": "[bold green]✅ Код надіслано![/bold green]",
+        "phone_code_prompt": "Введіть код підтвердження (з Telegram / SMS) > ",
+        "phone_2fa_notice": "У вашому акаунті увімкнено 2FA (двоетапну аутентифікацію)!",
+        "phone_2fa_prompt": "Введіть ваш пароль 2FA (хмарний пароль) > ",
+        "phone_auth_success": "Успішно авторизовано як {}!",
+        "phone_err_invalid": "Некоректний номер телефону: '{}'. Перевірте код країни (+380...)!",
+        "phone_err_code_invalid": "Невірний код підтвердження! Спробуйте ще раз.",
+        "phone_err_code_expired": "Термін дії коду вичерпано. Спробуйте увійти знову.",
+        "phone_err_flood": "Telegram обмежив спроби входу через ліміт. Зачекайте {} секунд.",
+        "phone_err_general": "Помилка входу: {}",
+        "qr_title": "📱 СКАНУВАННЯ QR-КОДУ ЧЕРЕЗ TELEGRAM",
+        "qr_hint": "Відкрийте Telegram -> Налаштування -> Пристрої -> Підключити пристрій",
+        "qr_waiting": "Очікуємо сканування QR-коду у додатку Telegram...",
+        "qr_auth_success": "Авторизовано через QR-код як {}!",
+        "qr_error": "Помилка входу через QR-код: {}",
+        "string_prompt": "Вставте StringSession > ",
+        "string_invalid": "Недійсна StringSession!",
+        "flash_table_title": "⚡ АКТИВНІ СЕСІЇ ПРОШИВКИ ТЕЛЕФОНІВ",
+        "flash_status_label": "Статус авто-прошивки",
+        "flash_enabled": "УВІМКНЕНО (Авто-обробка активна)",
+        "flash_disabled": "ВИМКНЕНО (Авто-обробка вимкнена)",
+        "flash_options": "Опції: [bold white]1[/bold white] Увімкнути/Вимкнути  |  [bold white]r[/bold white] Оновити  |  [bold red]0[/bold red] Повернутися в головне меню",
+        "flash_action_prompt": "Дія прошивки > ",
+        "flash_toggled": "Авто-прошивка тепер {}!",
+        "flash_no_sessions": "Немає активних сесій прошивки",
+        "flash_waiting_bot": "Слухаємо повідомлення бота...",
+        "log_auto_on": "Автоматичний режим увімкнено. Перший запит надіслано.",
+        "log_auto_off": "Автоматичний режим призупинено.",
+        "log_manual_trigger": "Ручний запуск '{}'...",
+        "log_sending_cmd": "Надсилаємо команду '{}'...",
+        "log_drop_received": "🎁 Отримано дроп: {} [{}] ({} pts)!",
+        "log_cooldown_detected": "Кулдаун: {} (+{}с джитер). Наступний запуск: {}.",
+        "log_wait_received": "Отримано повідомлення очікування. Повтор через {}.",
+        "log_cycle_success": "Успіх! Наступний цикл через {}.",
+        "log_no_reply": "Бот не відповів за 25с. Повтор через {}с.",
+        "log_session_revoked": "Збережена сесія втратила дію. Будь ласка, увійдіть заново через команду 'login'.",
+        "log_logged_out": "Успішно вийшли з акаунта. Сесію очищено.",
+        "log_bot_confirmed": "Цільового бота підтверджено: {} ({})"
     },
     "ru": {
         "title": "⚡ PHONEX SOFT v1.0",
@@ -239,10 +351,12 @@ TEXTS = {
         "state_paused": "⏸️ ПРИОСТАНОВЛЕНО",
         "state_rolling": "🎲 КРУТИМ...",
         "state_active": "🟢 АКТИВНО (АВТО)",
+        "state_connecting": "🟡 ПОДКЛЮЧЕНИЕ...",
         "hint_login": "Введите 'login' для входа",
         "hint_start": "Введите 'on' для запуска",
         "hint_rolling": "Отправляем команду боту",
         "hint_active": "Авто-ролл включен",
+        "hint_connecting": "Авторизация сессии...",
         "timer_ready": "⚡ ГОТОВО К РОЛЛУ",
         "timer_sending": "Запрос отправляется...",
         "timer_paused": "Таймер на паузе",
@@ -254,22 +368,23 @@ TEXTS = {
         "no_drops_yet": "Дропов в базе пока нет. Сделайте ролл!",
         "no_bot_replies": "Сообщений от бота ещё нет.",
         "log_empty": "Журнал пуст...",
-        "cmd_prompt_hint": "Введите [bold cyan]help[/bold cyan] для списка команд, [bold cyan]r[/bold cyan] для обновления, или [bold green]on[/bold green] для старта.",
+        "cmd_prompt_hint": "Введите [bold cyan]help[/bold cyan] для справки, [bold cyan]r[/bold cyan] для обновления, или [bold green]on[/bold green] для запуска.",
         "input_prompt": "\nКоманда > ",
+        "choice_prompt": "Выбор",
         "unknown_cmd": "Неизвестная команда '{}'. Введите 'help'.",
-        "press_enter": "\nНажмите Enter для возврата в главное меню...",
+        "press_enter": "\nНажмите Enter для возврата...",
         "shutdown_msg": "\n[bold yellow]Остановка и сохранение сессии...[/bold yellow]",
         "shutdown_done": "[bold green]Работа успешно завершена. Сессия сохранена![/bold green]\n",
         "lang_switched": "Язык переключен на Русский.",
         "inv_title": "📱 ИНВЕНТАРЬ БОТА (/myphones)",
         "inv_choose": "Выберите пункт по номеру:",
-        "inv_back_hint": "Введите [bold red]0[/bold red] для выхода в главное меню.",
+        "inv_back_hint": "Введите [bold red]0[/bold red] для возврата в главное меню.",
         "inv_flashed_blocked": "❌ Выбор 'Прошитые телефоны' отключен.",
-        "inv_invalid_choice": "Неверный номер кнопки!",
+        "inv_invalid_choice": "Некорректный номер кнопки!",
         "invlast_title": "🎁 ВЫБИТЫЕ АВТО-РОЛЛОМ ТЕЛЕФОНЫ (invlast)",
         "invlast_total": "Всего в базе",
         "invlast_sum": "Сумма",
-        "invlast_empty": "В базе еще нет сохраненных дропов. Запустите авто-ролл командой 'on' или отправьте 'send'!",
+        "invlast_empty": "В базе ещё нет сохранённых дропов. Запустите авто-ролл командой 'on' или сделайте 'send'!",
         "col_id": "ID",
         "col_device": "📱 Название устройства",
         "col_rarity": "✨ Редкость",
@@ -286,10 +401,57 @@ TEXTS = {
         "clearhist_deleted_count": "✅ Удалено {} записей о '{}'.",
         "chat_title": "💬 ПОСЛЕДНИЕ {} СООБЩЕНИЙ В ЧАТЕ С {}",
         "login_title": "🔐 АВТОРИЗАЦИЯ TELEGRAM MTPROTO",
-        "login_method_1": "1 -> Быстрый вход через QR-код (рекомендуется, сканировать в приложении TG)",
-        "login_method_2": "2 -> Вход по номеру телефона (код из 5 цифр в Telegram)",
+        "login_choose_method": "Выберите способ входа",
+        "login_method_1": "1 -> Быстрый вход через QR-код (Рекомендуется, сканировать в Telegram)",
+        "login_method_2": "2 -> Вход по номеру телефона (Код в приложении Telegram / SMS)",
         "login_method_3": "3 -> Вставить готовую StringSession",
-        "login_cancel": "0 -> Отмена"
+        "login_cancel": "0 -> Отмена",
+        "phone_login_title": "📱 ВХОД ПО НОМЕРУ ТЕЛЕФОНА",
+        "phone_login_hint": "Введите номер в международном формате (например: +380981234567) или '0' для отмены:",
+        "phone_empty_hint": "[yellow]Пожалуйста, введите номер телефона (например: +380981234567) или '0' для отмены.[/yellow]",
+        "phone_input_prompt": "Номер телефона > ",
+        "phone_sending": "Отправляем запрос авторизации для {}...",
+        "phone_code_app_sent": "[bold bright_green]✅ Код подтверждения отправлен в приложение Telegram![/bold bright_green]\n[bold bright_yellow]👉 ОТКРОЙТЕ ВАШЕ ПРИЛОЖЕНИЕ TELEGRAM (на телефоне или ПК).[/bold bright_yellow]\n[bold white]Код пришёл в служебный чат [cyan]'Telegram' / 'Служебные уведомления'[/cyan] (НЕ по SMS)![/bold white]",
+        "phone_code_sms_sent": "[bold bright_green]✅ Код подтверждения отправлен по SMS![/bold bright_green]\n[bold bright_yellow]👉 Проверьте обычные SMS-сообщения на вашем телефоне.[/bold bright_yellow]",
+        "phone_code_call_sent": "[bold yellow]📞 Telegram позвонит вам и продиктует код подтверждения.[/bold yellow]",
+        "phone_code_general_sent": "[bold green]✅ Код отправлен![/bold green]",
+        "phone_code_prompt": "Введите код подтверждения (из Telegram / SMS) > ",
+        "phone_2fa_notice": "В вашем аккаунте включена 2FA (двухэтапная аутентификация)!",
+        "phone_2fa_prompt": "Введите ваш пароль 2FA (облачный пароль) > ",
+        "phone_auth_success": "Успешно авторизован как {}!",
+        "phone_err_invalid": "Некорректный номер телефона: '{}'. Проверьте код страны (+380...)!",
+        "phone_err_code_invalid": "Неверный код подтверждения! Попробуйте ещё раз.",
+        "phone_err_code_expired": "Срок действия кода истёк. Попробуйте войти снова.",
+        "phone_err_flood": "Telegram временно ограничил попытки входа. Подождите {} секунд.",
+        "phone_err_general": "Ошибка входа: {}",
+        "qr_title": "📱 СКАНИРОВАНИЕ QR-КОДА ЧЕРЕЗ TELEGRAM",
+        "qr_hint": "Откройте Telegram -> Настройки -> Устройства -> Подключить устройство",
+        "qr_waiting": "Ожидаем сканирования QR-кода в Telegram...",
+        "qr_auth_success": "Авторизован через QR-код как {}!",
+        "qr_error": "Ошибка входа через QR-код: {}",
+        "string_prompt": "Вставьте StringSession > ",
+        "string_invalid": "Недействительная StringSession!",
+        "flash_table_title": "⚡ АКТИВНЫЕ СЕССИИ ПРОШИВКИ ТЕЛЕФОНОВ",
+        "flash_status_label": "Статус авто-прошивки",
+        "flash_enabled": "ВКЛЮЧЕНО (Авто-обработка активна)",
+        "flash_disabled": "ВЫКЛЮЧЕНО (Авто-обработка выключена)",
+        "flash_options": "Опции: [bold white]1[/bold white] Включить/Выключить  |  [bold white]r[/bold white] Обновить  |  [bold red]0[/bold red] Вернуться в главное меню",
+        "flash_action_prompt": "Действие прошивки > ",
+        "flash_toggled": "Авто-прошивка теперь {}!",
+        "flash_no_sessions": "Нет активных устройств на прошивке",
+        "flash_waiting_bot": "Ожидаем сообщений от бота...",
+        "log_auto_on": "Автоматический режим включен. Первый запрос отправлен.",
+        "log_auto_off": "Автоматический режим приостановлен.",
+        "log_manual_trigger": "Ручной запуск '{}'...",
+        "log_sending_cmd": "Отправляем команду '{}'...",
+        "log_drop_received": "🎁 Получен дроп: {} [{}] ({} pts)!",
+        "log_cooldown_detected": "Кулдаун: {} (+{}с джиттер). Следующий запуск: {}.",
+        "log_wait_received": "Получено сообщение ожидания. Повтор через {}.",
+        "log_cycle_success": "Успех! Следующий цикл через {}.",
+        "log_no_reply": "Бот не ответил за 25с. Повтор через {}с.",
+        "log_session_revoked": "Сохранённая сессия устарела. Пожалуйста, войдите снова с помощью 'login'.",
+        "log_logged_out": "Успешно вышли из аккаунта. Сессия очищена.",
+        "log_bot_confirmed": "Целевой бот подтверждён: {} ({})"
     }
 }
 
@@ -341,6 +503,12 @@ class TerminalAutomator:
             except Exception:
                 return template
         return template
+
+    async def _prompt_input(self, prompt_text: str = "") -> str:
+        loop = asyncio.get_running_loop()
+        sys.stdout.flush()
+        val = await loop.run_in_executor(None, input, prompt_text)
+        return val.strip()
 
     def add_log(self, text: str, level: str = "info"):
         now_str = datetime.now().strftime("%H:%M:%S")
@@ -413,7 +581,7 @@ class TerminalAutomator:
                 await self.resolve_target_bot(self.config.target_bot)
                 return True
             else:
-                self.handle_session_revoked("Saved session is no longer authorized")
+                self.handle_session_revoked(self.tr("log_session_revoked"))
                 return False
         except AUTH_TERMINATED_ERRORS:
             self.handle_session_revoked("Telegram session was revoked or expired")
@@ -425,115 +593,122 @@ class TerminalAutomator:
 
     async def interactive_login(self):
         self._is_interacting = True
+        loop = asyncio.get_running_loop()
         self.console.clear()
         self.console.print(Panel(
             Align.center(f"[bold cyan]{self.tr('login_title')}[/bold cyan]"),
             border_style="cyan"
         ))
 
-        if not self.config.api_id or not self.config.api_hash:
-            self.console.print("[yellow]Enter Telegram API Credentials (my.telegram.org):[/yellow]")
-            api_id_str = Prompt.ask("[bold green]API ID[/bold green]").strip()
-            api_hash_str = Prompt.ask("[bold green]API HASH[/bold green]").strip()
-            if api_id_str.isdigit() and api_hash_str:
-                self.config.api_id = int(api_id_str)
-                self.config.api_hash = api_hash_str
-                self.config.save()
-            else:
-                self.console.print("[bold red]Invalid API ID / HASH![/bold red]")
-                time.sleep(2)
-                self._is_interacting = False
-                return
-
-        await self.init_telethon_client("")
-        await self.client.connect()
-
-        self.console.print(f"\n[bold]{self.tr('login_title')}:[/bold]")
+        self.console.print(f"\n[bold]{self.tr('login_choose_method')}:[/bold]")
         self.console.print(f"  [bold green]1[/bold green] -> [cyan]{self.tr('login_method_1')}[/cyan]")
         self.console.print(f"  [bold green]2[/bold green] -> [cyan]{self.tr('login_method_2')}[/cyan]")
         self.console.print(f"  [bold green]3[/bold green] -> [cyan]{self.tr('login_method_3')}[/cyan]")
-        self.console.print(f"  [bold red]0[/bold red] -> {self.tr('login_cancel')}")
+        self.console.print(f"  [bold red]0[/bold red] -> [dim]{self.tr('login_cancel')}[/dim]")
 
-        choice = Prompt.ask("\nChoice", choices=["1", "2", "3", "0"], default="1")
+        choice = await self._prompt_input(f"\n{self.tr('choice_prompt')} [1/2/3/0] > ")
+        if not choice:
+            choice = "1"
 
         if choice == "1":
             try:
+                await self.init_telethon_client("")
+                await self.client.connect()
                 qr_login = await self.client.qr_login()
+
+                self.console.clear()
+                self.console.print(Panel(
+                    Align.center(f"[bold cyan]{self.tr('qr_title')}[/bold cyan]"),
+                    border_style="cyan"
+                ))
+                self.console.print(f"[dim]{self.tr('qr_hint')}[/dim]\n")
+
                 if HAS_QRCODE:
                     qr = qrcode.QRCode()
                     qr.add_data(qr_login.url)
-                    self.console.print("\n[bold green]рџ“± Scan QR Code with Telegram App:[/bold green]\n")
                     qr.print_ascii(invert=True)
                 else:
-                    self.console.print(f"\n[yellow]Open link in Telegram:[/yellow]\n{qr_login.url}")
+                    self.console.print(f"[yellow]{qr_login.url}[/yellow]")
 
-                self.console.print("\n[bold cyan]Waiting for QR Code scan...[/bold cyan]")
+                self.console.print(f"\n[bold cyan]{self.tr('qr_waiting')}[/bold cyan]")
                 try:
                     user = await qr_login.wait(timeout=120)
                 except SessionPasswordNeededError:
-                    pwd = Prompt.ask("[bold yellow]Enter 2FA Password[/bold yellow]", password=True)
+                    self.console.print(f"\n[yellow]{self.tr('phone_2fa_notice')}[/yellow]")
+                    pwd = await self._prompt_input(self.tr('phone_2fa_prompt'))
                     user = await self.client.sign_in(password=pwd)
 
                 self.current_user = user or await self.client.get_me()
                 saved_str = self.client.session.save()
                 self.save_session(saved_str)
                 self.state = STATE_CONNECTED
-                self.console.print(f"\n[bold green]Authorized as @{self.current_user.username or self.current_user.first_name}![/bold green]")
-                time.sleep(1.5)
+                u_name = f"@{self.current_user.username}" if self.current_user.username else self.current_user.first_name
+                self.console.print(f"\n[bold green]✅ {self.tr('qr_auth_success', u_name)}[/bold green]")
+                self.add_log(f"Authorized via QR: {u_name}", "success")
+                await self.resolve_target_bot(self.config.target_bot)
+                await asyncio.sleep(2.0)
             except Exception as e:
-                self.console.print(f"[bold red]QR Login error: {e}[/bold red]")
-                time.sleep(3)
+                self.console.print(f"\n[bold red]{self.tr('qr_error', str(e))}[/bold red]")
+                await self._prompt_input(self.tr('press_enter'))
 
         elif choice == "2":
             await self.init_telethon_client("")
             await self.client.connect()
 
-            self.console.print("\n[bold cyan]── Phone Number Login / Вхід за номером ──[/bold cyan]")
-            self.console.print("[dim]Введіть номер у міжнародному форматі (наприклад: [bold cyan]+380981234567[/bold cyan])[/dim]")
-            raw_phone = Prompt.ask("[bold green]Phone number[/bold green]").strip()
+            self.console.clear()
+            self.console.print(Panel(
+                Align.center(f"[bold cyan]{self.tr('phone_login_title')}[/bold cyan]"),
+                border_style="cyan"
+            ))
+            self.console.print(f"\n[bold white]{self.tr('phone_login_hint')}[/bold white]\n")
 
-            if not raw_phone:
-                self._is_interacting = False
-                return
+            raw_phone = ""
+            while not raw_phone:
+                raw_phone = await self._prompt_input(self.tr('phone_input_prompt'))
+                if raw_phone == "0":
+                    self._is_interacting = False
+                    return
+                if not raw_phone:
+                    self.console.print(self.tr('phone_empty_hint'))
 
+            import re
             phone = re.sub(r"[^\d+]", "", raw_phone)
             if phone.startswith("0") and len(phone) == 10:
                 phone = "+38" + phone
             elif not phone.startswith("+"):
                 phone = "+" + phone
 
-            self.console.print(f"\n[dim]Надсилаємо запит авторизації для [bold cyan]{phone}[/bold cyan]...[/dim]")
+            self.console.print(f"\n[dim]{self.tr('phone_sending', phone)}[/dim]")
 
             try:
                 sent = await self.client.send_code_request(phone)
 
                 import telethon.tl.types.auth as auth_types
                 if isinstance(sent.type, auth_types.SentCodeTypeApp):
-                    self.console.print(
-                        "\n[bold bright_green]✅ Код успішно надіслано в додаток Telegram![/bold bright_green]\n"
-                        "[bold bright_yellow]👉 ВІДКРИЙТЕ ВАШ ДОДАТОК TELEGRAM (на телефоні або ПК).[/bold bright_yellow]\n"
-                        "[bold white]Код надійшов у службовий чат [cyan]'Telegram' / 'Служебные уведомления'[/cyan] (не по SMS)![/bold white]\n"
-                    )
+                    dest_msg = self.tr('phone_code_app_sent')
                 elif isinstance(sent.type, auth_types.SentCodeTypeSms):
-                    self.console.print(
-                        "\n[bold bright_green]✅ Код надіслано через SMS![/bold bright_green]\n"
-                        "[bold bright_yellow]👉 Перевірте звичайні SMS-повідомлення на телефоні.[/bold bright_yellow]\n"
-                    )
+                    dest_msg = self.tr('phone_code_sms_sent')
                 elif isinstance(sent.type, auth_types.SentCodeTypeCall):
-                    self.console.print(
-                        "\n[bold yellow]📞 Telegram зателефонує вам і продиктує код голосом.[/bold yellow]\n"
-                    )
+                    dest_msg = self.tr('phone_code_call_sent')
                 else:
-                    self.console.print(f"\n[bold green]✅ Код надіслано ({sent.type.__class__.__name__})![/bold green]\n")
+                    dest_msg = self.tr('phone_code_general_sent')
 
-                code_raw = Prompt.ask("[bold green]Введіть код підтвердження з Telegram / SMS[/bold green]").strip()
+                self.console.print(f"\n{dest_msg}\n")
+
+                code_raw = ""
+                while not code_raw:
+                    code_raw = await self._prompt_input(self.tr('phone_code_prompt'))
+                    if code_raw == "0":
+                        self._is_interacting = False
+                        return
+
                 code = re.sub(r"\D", "", code_raw)
 
                 try:
                     await self.client.sign_in(phone=phone, code=code, phone_code_hash=sent.phone_code_hash)
                 except SessionPasswordNeededError:
-                    self.console.print("\n[yellow]🔐 У вашому акаунті увімкнено 2FA (двоетапну аутентифікацію)![/yellow]")
-                    pwd = Prompt.ask("[bold yellow]Введіть ваш пароль 2FA (хмарний пароль)[/bold yellow]", password=True)
+                    self.console.print(f"\n[yellow]{self.tr('phone_2fa_notice')}[/yellow]")
+                    pwd = await self._prompt_input(self.tr('phone_2fa_prompt'))
                     await self.client.sign_in(password=pwd)
 
                 self.current_user = await self.client.get_me()
@@ -541,28 +716,28 @@ class TerminalAutomator:
                 self.save_session(saved_str)
                 self.state = STATE_CONNECTED
                 u_name = f"@{self.current_user.username}" if self.current_user.username else self.current_user.first_name
-                self.console.print(f"\n[bold green]✅ Успішно авторизовано як {u_name}![/bold green]")
+                self.console.print(f"\n[bold green]✅ {self.tr('phone_auth_success', u_name)}[/bold green]")
                 self.add_log(f"Authorized via Phone: {u_name}", "success")
                 await self.resolve_target_bot(self.config.target_bot)
-                time.sleep(2.0)
+                await asyncio.sleep(2.0)
 
             except FloodWaitError as e:
-                self.console.print(f"\n[bold red]❌ Telegram обмежив надсилання коду через ліміт спроб. Зачекайте {e.seconds} сек.[/bold red]")
-                Prompt.ask("\n[dim]Натисніть Enter для повернення[/dim]")
+                self.console.print(f"\n[bold red]{self.tr('phone_err_flood', e.seconds)}[/bold red]")
+                await self._prompt_input(self.tr('press_enter'))
             except Exception as e:
                 err_str = str(e)
                 if "PHONE_NUMBER_INVALID" in err_str:
-                    self.console.print(f"\n[bold red]❌ Некоректний номер телефону: '{phone}'. Перевірте правильність коду країни (+380...)![/bold red]")
+                    self.console.print(f"\n[bold red]{self.tr('phone_err_invalid', phone)}[/bold red]")
                 elif "PHONE_CODE_INVALID" in err_str:
-                    self.console.print("\n[bold red]❌ Введено невірний код підтвердження! Спробуйте ще раз.[/bold red]")
+                    self.console.print(f"\n[bold red]{self.tr('phone_err_code_invalid')}[/bold red]")
                 elif "PHONE_CODE_EXPIRED" in err_str:
-                    self.console.print("\n[bold red]❌ Термін дії коду вичерпано. Спробуйте увійти знову.[/bold red]")
+                    self.console.print(f"\n[bold red]{self.tr('phone_err_code_expired')}[/bold red]")
                 else:
-                    self.console.print(f"\n[bold red]❌ Помилка входу: {e}[/bold red]")
-                Prompt.ask("\n[dim]Натисніть Enter для повернення[/dim]")
+                    self.console.print(f"\n[bold red]{self.tr('phone_err_general', str(e))}[/bold red]")
+                await self._prompt_input(self.tr('press_enter'))
 
         elif choice == "3":
-            session_str = Prompt.ask("[bold green]Paste StringSession[/bold green]").strip()
+            session_str = await self._prompt_input(f"\n{self.tr('string_prompt')}")
             if session_str:
                 self.save_session(session_str)
                 await self.init_telethon_client(session_str)
@@ -570,11 +745,12 @@ class TerminalAutomator:
                 if await self.client.is_user_authorized():
                     self.current_user = await self.client.get_me()
                     self.state = STATE_CONNECTED
-                    self.console.print(f"\n[bold green]Authorized as @{self.current_user.username or self.current_user.first_name}![/bold green]")
-                    time.sleep(1.5)
+                    u_name = f"@{self.current_user.username}" if self.current_user.username else self.current_user.first_name
+                    self.console.print(f"\n[bold green]✅ {self.tr('phone_auth_success', u_name)}[/bold green]")
+                    await asyncio.sleep(1.5)
                 else:
-                    self.console.print("[bold red]Invalid StringSession![/bold red]")
-                    time.sleep(2)
+                    self.console.print(f"\n[bold red]{self.tr('string_invalid')}[/bold red]")
+                    await asyncio.sleep(2.0)
 
         if self.state == STATE_CONNECTED:
             await self.resolve_target_bot(self.config.target_bot)
@@ -616,19 +792,19 @@ class TerminalAutomator:
         self.is_running = True
         self.state = STATE_WAITING
         self.next_run_timestamp = time.time()
-        self.add_log("Auto-mode activated. Initial check dispatched.", "success")
+        self.add_log(self.tr("log_auto_on"), "success")
 
     def turn_off(self):
         self.is_running = False
         self.state = STATE_PAUSED if self.state == STATE_CONNECTED else self.state
         self.next_run_timestamp = None
-        self.add_log("Auto-mode paused.", "warning")
+        self.add_log(self.tr("log_auto_off"), "warning")
 
     def force_send(self):
         if not self.target_entity:
             self.add_log("Target bot not resolved!", "error")
             return
-        self.add_log(f"Manual trigger '{self.config.command}'...", "info")
+        self.add_log(self.tr("log_manual_trigger", self.config.command), "info")
         self.next_run_timestamp = time.time()
 
     async def _send_and_handle(self):
@@ -639,7 +815,7 @@ class TerminalAutomator:
         self.is_sending = True
         self.state = STATE_ROLLING
         cmd = self.config.command
-        self.add_log(f"Sending command '{cmd}'...", "info")
+        self.add_log(self.tr("log_sending_cmd", cmd), "info")
 
         try:
             self.total_sent += 1
@@ -659,7 +835,7 @@ class TerminalAutomator:
                         price=drop["price"],
                         raw_message=resp_text
                     )
-                    self.add_log(f"рџЋЃ Drop received: {drop['device_name']} [{drop['rarity']}] ({drop['price']} pts)!", "success")
+                    self.add_log(f"🎁 Drop received: {drop['device_name']} [{drop['rarity']}] ({drop['price']} pts)!", "success")
 
                 wait_s = parse_cooldown_seconds(resp_text)
                 if wait_s is not None and wait_s > 0:
@@ -844,7 +1020,7 @@ class TerminalAutomator:
             grid.add_column(ratio=3)
             grid.add_column(ratio=4)
             if self.flasher.sessions:
-                flash_panel = Panel(Text.from_markup(self.flasher.summary_badge()), border_style="bright_cyan", padding=(0, 1))
+                flash_panel = Panel(Text.from_markup(self.flasher.summary_badge(lang=self.config.language)), border_style="bright_cyan", padding=(0, 1))
                 outer_grid = Table.grid(expand=True)
                 outer_grid.add_row(grid)
                 outer_grid.add_row(flash_panel)
@@ -904,16 +1080,16 @@ class TerminalAutomator:
             for ts, raw_msg, level in self.logs[-6:]:
                 if level == "success":
                     style = "green"
-                    prefix = "✅ "
+                    prefix = "[bold green]✔[/bold green] "
                 elif level == "warning":
                     style = "yellow"
-                    prefix = "⚠️ "
+                    prefix = "[bold yellow]![/bold yellow] "
                 elif level == "error":
                     style = "bold red"
-                    prefix = "❌ "
+                    prefix = "[bold red]✖[/bold red] "
                 else:
                     style = "white"
-                    prefix = "ℹ️ "
+                    prefix = "[bold cyan]•[/bold cyan] "
 
                 # Strip any existing duplicate prefix icon
                 clean_msg = raw_msg
@@ -1045,12 +1221,12 @@ class TerminalAutomator:
                 break
 
             table = Table(title=f"[bold yellow]{self.tr('inv_choose')}[/bold yellow]", expand=True, border_style="dim yellow")
-            table.add_column("в„–", style="bold bright_cyan", width=6, justify="center")
+            table.add_column("№", style="bold bright_cyan", width=6, justify="center")
             table.add_column("Button", style="bold white")
 
             for idx, btn in enumerate(buttons_list, start=1):
                 btn_title = btn.text or "[Button]"
-                if "РїСЂРѕС€РёС‚" in btn_title.lower() or "flashed" in btn_title.lower():
+                if "прошит" in btn_title.lower() or "flashed" in btn_title.lower():
                     btn_title = f"{btn_title} [dim red](Disabled)[/dim red]"
                 table.add_row(str(idx), btn_title)
 
@@ -1071,7 +1247,7 @@ class TerminalAutomator:
                 selected_btn = buttons_list[choice_idx]
                 btn_name = selected_btn.text or ""
 
-                if "РїСЂРѕС€РёС‚" in btn_name.lower() or "flashed" in btn_name.lower():
+                if "прошит" in btn_name.lower() or "flashed" in btn_name.lower():
                     self.console.print(f"[bold red]{self.tr('inv_flashed_blocked')}[/bold red]")
                     time.sleep(1.5)
                     continue
@@ -1135,33 +1311,32 @@ class TerminalAutomator:
 
     async def show_flashing_screen(self):
         self._is_interacting = True
-        loop = asyncio.get_running_loop()
         self.console.clear()
 
-        table = self.flasher.render_overview_table()
+        table = self.flasher.render_overview_table(lang=self.config.language)
         self.console.print(table)
 
-        status_txt = "ENABLED (Auto-handling active)" if self.flasher.enabled else "DISABLED"
-        self.console.print(f"\n[bold]Auto-flasher Status:[/] [bold cyan]{status_txt}[/bold cyan]")
-        self.console.print("[dim]Options: [bold white]1[/bold white] Toggle On/Off  |  [bold white]r[/bold white] Refresh  |  [bold red]0[/bold red] Return[/dim]")
+        status_txt = self.tr('flash_enabled') if self.flasher.enabled else self.tr('flash_disabled')
+        self.console.print(f"\n[bold]{self.tr('flash_status_label')}:[/] [bold cyan]{status_txt}[/bold cyan]")
+        self.console.print(f"[dim]{self.tr('flash_options')}[/dim]")
 
         while True:
-            choice = await loop.run_in_executor(None, input, "\nFlash Action > ")
+            choice = await self._prompt_input(f"\n{self.tr('flash_action_prompt')}")
             choice = choice.strip().lower()
             if choice == "0" or not choice:
                 break
             elif choice in ("1", "toggle", "on", "off"):
                 self.flasher.enabled = not self.flasher.enabled
-                st = "ENABLED" if self.flasher.enabled else "DISABLED"
-                self.console.print(f"[bold green]Auto-flasher is now {st}![/bold green]")
-                time.sleep(1.0)
+                st = self.tr('flash_enabled') if self.flasher.enabled else self.tr('flash_disabled')
+                self.console.print(f"[bold green]{self.tr('flash_toggled', st)}[/bold green]")
+                await asyncio.sleep(1.0)
                 break
             elif choice in ("r", "refresh"):
                 self.console.clear()
-                self.console.print(self.flasher.render_overview_table())
-                status_txt = "ENABLED (Auto-handling active)" if self.flasher.enabled else "DISABLED"
-                self.console.print(f"\n[bold]Auto-flasher Status:[/] [bold cyan]{status_txt}[/bold cyan]")
-                self.console.print("[dim]Options: [bold white]1[/bold white] Toggle On/Off  |  [bold white]r[/bold white] Refresh  |  [bold red]0[/bold red] Return[/dim]")
+                self.console.print(self.flasher.render_overview_table(lang=self.config.language))
+                status_txt = self.tr('flash_enabled') if self.flasher.enabled else self.tr('flash_disabled')
+                self.console.print(f"\n[bold]{self.tr('flash_status_label')}:[/] [bold cyan]{status_txt}[/bold cyan]")
+                self.console.print(f"[dim]{self.tr('flash_options')}[/dim]")
 
         self._is_interacting = False
 
@@ -1391,13 +1566,13 @@ class TerminalAutomator:
                 elif cmd in ("lang", "language", "мова", "язык", "english", "русский", "українська"):
                     chosen = None
                     if cmd in ("english", "en"): chosen = "en"
-                    elif cmd in ("СЂСѓСЃСЃРєРёР№", "ru"): chosen = "ru"
-                    elif cmd in ("СѓРєСЂР°С—РЅСЃСЊРєР°", "ua"): chosen = "ua"
+                    elif cmd in ("русский", "ru"): chosen = "ru"
+                    elif cmd in ("українська", "ua"): chosen = "ua"
                     elif args:
                         arg_low = args[0].lower()
                         if arg_low in ("en", "english"): chosen = "en"
-                        elif arg_low in ("ru", "СЂСѓСЃСЃРєРёР№", "russian"): chosen = "ru"
-                        elif arg_low in ("ua", "uk", "СѓРєСЂР°С—РЅСЃСЊРєР°", "ukrainian"): chosen = "ua"
+                        elif arg_low in ("ru", "русский", "russian"): chosen = "ru"
+                        elif arg_low in ("ua", "uk", "українська", "ukrainian"): chosen = "ua"
                     await self.interactive_language_switch(chosen)
                 elif cmd in ("chat", "history"):
                     lim = int(args[0]) if args and args[0].isdigit() else 10
@@ -1410,7 +1585,7 @@ class TerminalAutomator:
                     self.clear_session()
                     self.state = STATE_DISCONNECTED
                     self.current_user = None
-                    self.add_log("Logged out successfully. Session cleared.", "info")
+                    self.add_log(self.tr("log_logged_out"), "info")
                 elif cmd == "bot":
                     if args:
                         new_bot = args[0]

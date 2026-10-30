@@ -22,7 +22,7 @@ class AppConfig:
     api_hash: str = DEFAULT_API_HASH
     target_bot: str = "@phonegetcardsbot"
     command: str = "/tcard"
-    language: str = "en"
+    language: str = "ua"
     chat_limit: int = 30
     safety_jitter_seconds: int = 5
     default_interval_seconds: int = 3 * 3600

@@ -42,3 +42,5 @@ Thumbs.db
 *.7z
 *.rar
 *.tar.gz
+
+.idea/
