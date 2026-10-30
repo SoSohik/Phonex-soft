@@ -378,14 +378,14 @@ class TerminalAutomator:
         self.next_run_timestamp = None
         self.add_log(f"⚠️ {reason}. Please log in again using 'login'.", "warning")
 
-    async def init_telethon_client(self, session_str: str = "") -> TelegramClient:
+    async def init_telethon_client(self, session_str: Optional[str] = None) -> TelegramClient:
         if self.client and self.client.is_connected():
             try:
                 await self.client.disconnect()
             except Exception:
                 pass
 
-        if not session_str:
+        if session_str is None:
             session_str = self.load_saved_session()
 
         string_session = StringSession(session_str)
@@ -485,25 +485,81 @@ class TerminalAutomator:
                 time.sleep(3)
 
         elif choice == "2":
-            phone = Prompt.ask("[bold green]Enter phone number (+123...)[/bold green]").strip()
+            await self.init_telethon_client("")
+            await self.client.connect()
+
+            self.console.print("\n[bold cyan]── Phone Number Login / Вхід за номером ──[/bold cyan]")
+            self.console.print("[dim]Введіть номер у міжнародному форматі (наприклад: [bold cyan]+380981234567[/bold cyan])[/dim]")
+            raw_phone = Prompt.ask("[bold green]Phone number[/bold green]").strip()
+
+            if not raw_phone:
+                self._is_interacting = False
+                return
+
+            phone = re.sub(r"[^\d+]", "", raw_phone)
+            if phone.startswith("0") and len(phone) == 10:
+                phone = "+38" + phone
+            elif not phone.startswith("+"):
+                phone = "+" + phone
+
+            self.console.print(f"\n[dim]Надсилаємо запит авторизації для [bold cyan]{phone}[/bold cyan]...[/dim]")
+
             try:
                 sent = await self.client.send_code_request(phone)
-                code = Prompt.ask("[bold green]Enter 5-digit verification code[/bold green]").strip()
+
+                import telethon.tl.types.auth as auth_types
+                if isinstance(sent.type, auth_types.SentCodeTypeApp):
+                    self.console.print(
+                        "\n[bold bright_green]✅ Код успішно надіслано в додаток Telegram![/bold bright_green]\n"
+                        "[bold bright_yellow]👉 ВІДКРИЙТЕ ВАШ ДОДАТОК TELEGRAM (на телефоні або ПК).[/bold bright_yellow]\n"
+                        "[bold white]Код надійшов у службовий чат [cyan]'Telegram' / 'Служебные уведомления'[/cyan] (не по SMS)![/bold white]\n"
+                    )
+                elif isinstance(sent.type, auth_types.SentCodeTypeSms):
+                    self.console.print(
+                        "\n[bold bright_green]✅ Код надіслано через SMS![/bold bright_green]\n"
+                        "[bold bright_yellow]👉 Перевірте звичайні SMS-повідомлення на телефоні.[/bold bright_yellow]\n"
+                    )
+                elif isinstance(sent.type, auth_types.SentCodeTypeCall):
+                    self.console.print(
+                        "\n[bold yellow]📞 Telegram зателефонує вам і продиктує код голосом.[/bold yellow]\n"
+                    )
+                else:
+                    self.console.print(f"\n[bold green]✅ Код надіслано ({sent.type.__class__.__name__})![/bold green]\n")
+
+                code_raw = Prompt.ask("[bold green]Введіть код підтвердження з Telegram / SMS[/bold green]").strip()
+                code = re.sub(r"\D", "", code_raw)
+
                 try:
                     await self.client.sign_in(phone=phone, code=code, phone_code_hash=sent.phone_code_hash)
                 except SessionPasswordNeededError:
-                    pwd = Prompt.ask("[bold yellow]Enter 2FA Password[/bold yellow]", password=True)
+                    self.console.print("\n[yellow]🔐 У вашому акаунті увімкнено 2FA (двоетапну аутентифікацію)![/yellow]")
+                    pwd = Prompt.ask("[bold yellow]Введіть ваш пароль 2FA (хмарний пароль)[/bold yellow]", password=True)
                     await self.client.sign_in(password=pwd)
 
                 self.current_user = await self.client.get_me()
                 saved_str = self.client.session.save()
                 self.save_session(saved_str)
                 self.state = STATE_CONNECTED
-                self.console.print(f"\n[bold green]Authorized as @{self.current_user.username or self.current_user.first_name}![/bold green]")
-                time.sleep(1.5)
+                u_name = f"@{self.current_user.username}" if self.current_user.username else self.current_user.first_name
+                self.console.print(f"\n[bold green]✅ Успішно авторизовано як {u_name}![/bold green]")
+                self.add_log(f"Authorized via Phone: {u_name}", "success")
+                await self.resolve_target_bot(self.config.target_bot)
+                time.sleep(2.0)
+
+            except FloodWaitError as e:
+                self.console.print(f"\n[bold red]❌ Telegram обмежив надсилання коду через ліміт спроб. Зачекайте {e.seconds} сек.[/bold red]")
+                Prompt.ask("\n[dim]Натисніть Enter для повернення[/dim]")
             except Exception as e:
-                self.console.print(f"[bold red]Phone login error: {e}[/bold red]")
-                time.sleep(3)
+                err_str = str(e)
+                if "PHONE_NUMBER_INVALID" in err_str:
+                    self.console.print(f"\n[bold red]❌ Некоректний номер телефону: '{phone}'. Перевірте правильність коду країни (+380...)![/bold red]")
+                elif "PHONE_CODE_INVALID" in err_str:
+                    self.console.print("\n[bold red]❌ Введено невірний код підтвердження! Спробуйте ще раз.[/bold red]")
+                elif "PHONE_CODE_EXPIRED" in err_str:
+                    self.console.print("\n[bold red]❌ Термін дії коду вичерпано. Спробуйте увійти знову.[/bold red]")
+                else:
+                    self.console.print(f"\n[bold red]❌ Помилка входу: {e}[/bold red]")
+                Prompt.ask("\n[dim]Натисніть Enter для повернення[/dim]")
 
         elif choice == "3":
             session_str = Prompt.ask("[bold green]Paste StringSession[/bold green]").strip()
