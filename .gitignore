@@ -1,0 +1,38 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Telegram session files & local data
+*.session
+*.session-journal
+data/session.dat
+data/settings.json
+data/*.db
+data/*.db-journal
+
+# Environment / OS artifacts
+.env
+.DS_Store
+Thumbs.db
+*.bak
