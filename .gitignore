@@ -36,3 +36,9 @@ data/*.db-journal
 .DS_Store
 Thumbs.db
 *.bak
+
+# Archives
+*.zip
+*.7z
+*.rar
+*.tar.gz

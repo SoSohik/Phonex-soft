@@ -56,6 +56,7 @@ except ImportError:
 from config import AppConfig
 from database import InventoryDB
 from drop_parser import parse_drop_message
+from flasher import DeviceFlashingManager, HAS_PYTESSERACT
 from time_parser import parse_cooldown_seconds, calculate_wait_time, is_wait_message, format_countdown, format_duration_friendly
 
 
@@ -301,6 +302,7 @@ class TerminalAutomator:
             self.config.language = "en"
 
         self.db = InventoryDB()
+        self.flasher = DeviceFlashingManager(automator=self)
         self.client: Optional[TelegramClient] = None
         self.current_user = None
         self.target_entity = None
@@ -531,11 +533,28 @@ class TerminalAutomator:
             self.config.target_bot = username
             title = getattr(self.target_entity, 'title', None) or getattr(self.target_entity, 'first_name', username)
             self.add_log(f"Target bot confirmed: {title} ({username})", "success")
+            self._setup_flasher_events()
             return True
         except Exception as e:
             self.add_log(f"Lookup error for '{username}': {e}", "warning")
             self.target_entity = None
             return False
+
+    def _setup_flasher_events(self):
+        if not self.client or not self.target_entity:
+            return
+        try:
+            self.client.remove_event_handler(self.flasher.on_bot_message_event)
+        except Exception:
+            pass
+        self.client.add_event_handler(
+            self.flasher.on_bot_message_event,
+            events.NewMessage(chats=self.target_entity)
+        )
+        self.client.add_event_handler(
+            self.flasher.on_bot_message_event,
+            events.MessageEdited(chats=self.target_entity)
+        )
 
     def turn_on(self):
         self.is_running = True
@@ -768,8 +787,16 @@ class TerminalAutomator:
             grid.add_column(ratio=3)
             grid.add_column(ratio=3)
             grid.add_column(ratio=4)
-            grid.add_row(panel_status, panel_timer, panel_stats)
-            return grid
+            if self.flasher.sessions:
+                flash_panel = Panel(Text.from_markup(self.flasher.summary_badge()), border_style="bright_cyan", padding=(0, 1))
+                outer_grid = Table.grid(expand=True)
+                outer_grid.add_row(grid)
+                outer_grid.add_row(flash_panel)
+                grid.add_row(panel_status, panel_timer, panel_stats)
+                return outer_grid
+            else:
+                grid.add_row(panel_status, panel_timer, panel_stats)
+                return grid
 
 
     def render_latest_drop_and_response(self) -> Table:
@@ -857,6 +884,7 @@ class TerminalAutomator:
             t.add_row("off (stop)", "Призупинити автоматичний режим")
             t.add_row("send (now)", "Примусово надіслати команду ролу")
             t.add_row("refresh (r)", "Оновити екран та таймер кулдауну")
+            t.add_row("flash [on/off]", "Авто-прошивка девайсів (offline OCR)")
             t.add_row("inv", "Інтерактивний перегляд /myphones з кнопками")
             t.add_row("invlast", "Історія та статистика вибитих телефонів з SQLite")
             t.add_row("clearhistory", "Очистити всю або вибрану історію вибитих телефонів")
@@ -874,6 +902,7 @@ class TerminalAutomator:
             t.add_row("off (stop)", "Приостановить автоматический режим")
             t.add_row("send (now)", "Принудительно отправить команду ролла")
             t.add_row("refresh (r)", "Обновить экран и таймер кулдауна")
+            t.add_row("flash [on/off]", "Авто-прошивка девайсов (offline OCR)")
             t.add_row("inv", "Интерактивный просмотр /myphones с кнопками")
             t.add_row("invlast", "История и статистика выбитых телефонов из SQLite")
             t.add_row("clearhistory", "Очистить всю или выбранную историю телефонов")
@@ -891,6 +920,7 @@ class TerminalAutomator:
             t.add_row("off (stop)", "Pause automated roll loop")
             t.add_row("send (now)", "Force roll trigger immediately")
             t.add_row("refresh (r)", "Refresh screen and countdown timer")
+            t.add_row("flash [on/off]", "Device firmware flashing manager (offline OCR)")
             t.add_row("inv", "Interactive /myphones explorer with buttons")
             t.add_row("invlast", "History & stats of dropped phones from SQLite")
             t.add_row("clearhistory", "Clear all or specific device drop history")
@@ -1046,6 +1076,38 @@ class TerminalAutomator:
             return None
         finally:
             self.client.remove_event_handler(handler)
+
+    async def show_flashing_screen(self):
+        self._is_interacting = True
+        loop = asyncio.get_running_loop()
+        self.console.clear()
+
+        table = self.flasher.render_overview_table()
+        self.console.print(table)
+
+        status_txt = "ENABLED (Auto-handling active)" if self.flasher.enabled else "DISABLED"
+        self.console.print(f"\n[bold]Auto-flasher Status:[/] [bold cyan]{status_txt}[/bold cyan]")
+        self.console.print("[dim]Options: [bold white]1[/bold white] Toggle On/Off  |  [bold white]r[/bold white] Refresh  |  [bold red]0[/bold red] Return[/dim]")
+
+        while True:
+            choice = await loop.run_in_executor(None, input, "\nFlash Action > ")
+            choice = choice.strip().lower()
+            if choice == "0" or not choice:
+                break
+            elif choice in ("1", "toggle", "on", "off"):
+                self.flasher.enabled = not self.flasher.enabled
+                st = "ENABLED" if self.flasher.enabled else "DISABLED"
+                self.console.print(f"[bold green]Auto-flasher is now {st}![/bold green]")
+                time.sleep(1.0)
+                break
+            elif choice in ("r", "refresh"):
+                self.console.clear()
+                self.console.print(self.flasher.render_overview_table())
+                status_txt = "ENABLED (Auto-handling active)" if self.flasher.enabled else "DISABLED"
+                self.console.print(f"\n[bold]Auto-flasher Status:[/] [bold cyan]{status_txt}[/bold cyan]")
+                self.console.print("[dim]Options: [bold white]1[/bold white] Toggle On/Off  |  [bold white]r[/bold white] Refresh  |  [bold red]0[/bold red] Return[/dim]")
+
+        self._is_interacting = False
 
     async def show_invlast_screen(self):
         self._is_interacting = True
@@ -1255,6 +1317,15 @@ class TerminalAutomator:
                 elif cmd in ("send", "now", "roll"):
                     self.force_send()
                     show_help = False
+                elif cmd in ("flash", "flashing", "прошивка", "прошивки"):
+                    if args and args[0] in ("on", "start", "enable"):
+                        self.flasher.enabled = True
+                        self.add_log("Auto-flashing module ENABLED.", "success")
+                    elif args and args[0] in ("off", "stop", "disable"):
+                        self.flasher.enabled = False
+                        self.add_log("Auto-flashing module DISABLED.", "warning")
+                    else:
+                        await self.show_flashing_screen()
                 elif cmd in ("inv", "myphones", "phones"):
                     await self.interactive_myphones_explorer()
                 elif cmd in ("invlast", "last", "history_drops", "drops"):
